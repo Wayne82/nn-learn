@@ -1,12 +1,32 @@
 import numpy as np
 import func_util as fu
 
+class NNetOptions:
+    """
+    Class to hold options for the neural network.
+    """
+    def __init__(self,
+                 hidden_activation = fu.ActivationFunction.SIGMOID,
+                 output_activation=fu.ActivationFunction.SIGMOID,
+                 cost=fu.CostFunction.QUADRATIC):
+        self.activation_fns = {
+            'hidden': fu.ActivationFunction.get_activation_function(hidden_activation),
+            'output': fu.ActivationFunction.get_activation_function(output_activation)
+        }
+        self.cost_fn = fu.CostFunction.get_cost_function(cost)
+
+    def __str__(self):
+        return f"Activations: {self.activation_fns}, Cost: {self.cost_fn}"
+
 class NNet(object):
-    def __init__(self, layers):
+    def __init__(self, layers, options=NNetOptions()):
         self.size = len(layers)
         self.layers = layers
         self.biases = [np.random.randn(y, 1) for y in layers[1:]]
         self.weights = [np.random.randn(y, x) for x, y in zip(layers[:-1], layers[1:])]
+
+        self.activation_fns = options.activation_fns
+        self.cost_fn = options.cost_fn
 
     def SGD(self, training_data, epochs, batch_size, learning_rate=0.01, test_data=None):
         """
@@ -38,9 +58,16 @@ class NNet(object):
         :param x: Input data
         :return: Predicted output
         """
-        # a = self._forward(x)
-        # return np.argmax(a)
-        self._forward(x)
+        return self._forward(x)
+
+    def predict_number(self, x):
+        """
+        Make predictions using the trained network.
+        :param x: Input data
+        :return: Predicted number
+        """
+        a = self._forward(x)
+        return np.argmax(a)
 
     def evaluate(self, test_data):
         """
@@ -68,17 +95,27 @@ class NNet(object):
         :param keep_activations: Whether to keep activations for backpropagation
         :return: Output of the network
         """
+        n = [x+1 for x in np.arange(self.size - 1)]
         if keep_activations:
             self.activations = [x]
             self.zs = []
-            for b, w in zip(self.biases, self.weights):
+            for b, w, i in zip(self.biases, self.weights, n):
                 z = np.dot(w, x) + b
                 self.zs.append(z)
-                x = fu.sigmoid(z)
+
+                if i == self.size - 1:
+                    x = self.activation_fns['output'].fn(z)
+                else:
+                    x = self.activation_fns['hidden'].fn(z)
+
                 self.activations.append(x)
         else:
-            for b, w in zip(self.biases, self.weights):
-                x = fu.sigmoid(np.dot(w, x) + b)
+            for b, w, i in zip(self.biases, self.weights, n):
+                z = np.dot(w, x) + b
+                if i == self.size - 1:
+                    x = self.activation_fns['output'].fn(z)
+                else:
+                    x = self.activation_fns['hidden'].fn(z)
 
         return x
 
@@ -95,7 +132,7 @@ class NNet(object):
 
         Apply equation (BP1) from the backpropagation algorithm
         """
-        delta = fu.quadratic_loss_prime(y, self.activations[-1]) * fu.sigmoid_prime(self.zs[-1])
+        delta = self.cost_fn.prime(y, self.activations[-1]) * self.activation_fns['output'].prime(self.zs[-1])
         """
         Apply equation (BP3) and (BP4) from the backpropagation algorithm
         """
@@ -107,7 +144,7 @@ class NNet(object):
         """
         for l in range(2, self.size):
             z = self.zs[-l]
-            sp = fu.sigmoid_prime(z)
+            sp = self.activation_fns['hidden'].prime(z)
             """
             Apply equation (BP2) from the backpropagation algorithm
             """

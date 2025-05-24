@@ -1,51 +1,94 @@
 import numpy as np
 
-def sigmoid(z):
+class ActivationFunction:
     """
-    Sigmoid activation function.
-    :param z: Input value
-    :return: Sigmoid of the input
+    Enum for activation functions.
     """
-    return 1.0 / (1.0 + np.exp(-z))
+    SIGMOID = 1
+    RELU = 2
+    SOFTMAX = 3
 
-def sigmoid_prime(z):
-    """
-    Derivative of the sigmoid function.
-    :param z: Input value
-    :return: Derivative of the sigmoid
-    """
-    return sigmoid(z) * (1 - sigmoid(z))
+    @staticmethod
+    def get_activation_function(activation):
+        """
+        Get the activation function class based on the provided type.
+        :param activation: Type of activation function
+        :return: Corresponding activation function class
+        """
+        if activation == ActivationFunction.SIGMOID:
+            return Sigmoid
+        elif activation == ActivationFunction.RELU:
+            return ReLU
+        elif activation == ActivationFunction.SOFTMAX:
+            return Softmax
+        else:
+            raise ValueError("Invalid activation function type.")
 
-def relu(z):
+class CostFunction:
     """
-    ReLU activation function.
-    :param z: Input value
-    :return: ReLU of the input
+    Enum for cost functions.
     """
-    return np.maximum(0, z)
+    QUADRATIC = 1
+    CROSS_ENTROPY = 2
 
-def relu_prime(z):
-    """
-    Derivative of the ReLU function.
-    :param z: Input value
-    :return: Derivative of the ReLU
-    """
-    return np.where(z > 0, 1, 0)
+    @staticmethod
+    def get_cost_function(cost):
+        """
+        Get the cost function class based on the provided type.
+        :param cost: Type of cost function
+        :return: Corresponding cost function class
+        """
+        if cost == CostFunction.QUADRATIC:
+            return QuadraticLoss
+        elif cost == CostFunction.CROSS_ENTROPY:
+            return CrossEntropyLoss
+        else:
+            raise ValueError("Invalid cost function type.")
 
-def quadratic_loss(y_true, y_pred):
-    """
-    Compute the quadratic loss.
-    :param y_true: True labels
-    :param y_pred: Predicted labels
-    :return: Quadratic loss
-    """
-    return 0.5 * np.sum((y_pred - y_true) ** 2)
+class Sigmoid:
+    @staticmethod
+    def fn(z):
+        return 1.0 / (1.0 + np.exp(-z))
 
-def quadratic_loss_prime(y_true, y_pred):
-    """
-    Compute the derivative of the quadratic loss.
-    :param y_true: True labels
-    :param y_pred: Predicted labels
-    :return: Derivative of the quadratic loss
-    """
-    return y_pred - y_true
+    @staticmethod
+    def prime(z):
+        s = Sigmoid.fn(z)
+        return s * (1 - s)
+
+class ReLU:
+    @staticmethod
+    def fn(z):
+        return np.maximum(0, z)
+
+    @staticmethod
+    def prime(z):
+        return np.where(z > 0, 1, 0)
+
+class Softmax:
+    @staticmethod
+    def fn(z):
+        exp_z = np.exp(z - np.max(z))  # for numerical stability
+        return exp_z / np.sum(exp_z, axis=0, keepdims=True)
+
+    @staticmethod
+    def prime(z):
+        s = Softmax.fn(z)
+        return s * (1 - s)  # Simplified; for full Jacobian, use np.diag(s) - np.outer(s, s)
+
+class QuadraticLoss:
+    @staticmethod
+    def fn(y_true, y_pred):
+        return 0.5 * np.sum((y_pred - y_true) ** 2)
+
+    @staticmethod
+    def prime(y_true, y_pred):
+        return y_pred - y_true
+
+class CrossEntropyLoss:
+    @staticmethod
+    def fn(y_true, y_pred):
+        return -np.sum(y_true * np.log(y_pred + 1e-15))  # add small value to avoid log(0)
+
+    @staticmethod
+    def prime(y_true, y_pred):
+        return -y_true / (y_pred + 1e-15)  # add small value to avoid division by zero
