@@ -55,6 +55,10 @@ class Sigmoid:
         s = Sigmoid.fn(z)
         return s * (1 - s)
 
+    @staticmethod
+    def initialize_weights_coefficient(x):
+        return np.sqrt(1.0 / x)
+
 class ReLU:
     @staticmethod
     def fn(z):
@@ -63,6 +67,10 @@ class ReLU:
     @staticmethod
     def prime(z):
         return np.where(z > 0, 1, 0)
+
+    @staticmethod
+    def initialize_weights_coefficient(x):
+        return np.sqrt(2.0 / x)  # He initialization for ReLU
 
 class Softmax:
     @staticmethod

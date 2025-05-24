@@ -22,11 +22,10 @@ class NNet(object):
     def __init__(self, layers, options=NNetOptions()):
         self.size = len(layers)
         self.layers = layers
-        self.biases = [np.random.randn(y, 1) for y in layers[1:]]
-        self.weights = [np.random.randn(y, x) for x, y in zip(layers[:-1], layers[1:])]
-
         self.activation_fns = options.activation_fns
         self.cost_fn = options.cost_fn
+
+        self._weights_initialization()
 
     def SGD(self, training_data, epochs, batch_size, learning_rate=0.01, test_data=None):
         """
@@ -87,6 +86,21 @@ class NNet(object):
         test_results = [(np.argmax(self._forward(x)), y) for (x, y) in test_data]
         accurate = sum(int(x == y) for (x, y) in test_results)
         return accurate, len(test_results), accurate / len(test_results)
+
+    def _weights_initialization(self):
+        """
+        Initialize weights and biases for the network.
+        :return: None
+        """
+        self.biases = [np.random.randn(y, 1) for y in self.layers[1:]]
+
+        h_coefficient = self.activation_fns['hidden'].initialize_weights_coefficient
+        o_coefficient = self.activation_fns['output'].initialize_weights_coefficient
+
+        # Initialize weights in hidden layers
+        self.weights = [np.random.randn(y, x) * h_coefficient(x) for x, y in zip(self.layers[:-1], self.layers[1:-1])]
+        # Initialize weights in output layer
+        self.weights.append(np.random.randn(self.layers[-1], self.layers[-2]) * o_coefficient(self.layers[-2]))
 
     def _forward(self, x, keep_activations=False):
         """
