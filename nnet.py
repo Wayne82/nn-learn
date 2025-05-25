@@ -112,27 +112,22 @@ class NNet(object):
         :param keep_activations: Whether to keep activations for backpropagation
         :return: Output of the network
         """
-        n = [x+1 for x in np.arange(self.size - 1)]
+        n = [y+1 for y in np.arange(self.size - 1)]
         if keep_activations:
             self.activations = [x]
             self.zs = []
-            for b, w, i in zip(self.biases, self.weights, n):
-                z = np.dot(w, x) + b
+
+        for b, w, i in zip(self.biases, self.weights, n):
+            z = np.dot(w, x) + b
+
+            if i == self.size - 1:
+                x = self.activation_fns['output'].fn(z)
+            else:
+                x = self.activation_fns['hidden'].fn(z)
+
+            if keep_activations:
                 self.zs.append(z)
-
-                if i == self.size - 1:
-                    x = self.activation_fns['output'].fn(z)
-                else:
-                    x = self.activation_fns['hidden'].fn(z)
-
                 self.activations.append(x)
-        else:
-            for b, w, i in zip(self.biases, self.weights, n):
-                z = np.dot(w, x) + b
-                if i == self.size - 1:
-                    x = self.activation_fns['output'].fn(z)
-                else:
-                    x = self.activation_fns['hidden'].fn(z)
 
         return x
 
