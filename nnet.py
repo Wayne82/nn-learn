@@ -8,12 +8,14 @@ class NNetOptions:
     def __init__(self,
                  hidden_activation = fu.ActivationFunction.SIGMOID,
                  output_activation=fu.ActivationFunction.SIGMOID,
-                 cost=fu.CostFunction.QUADRATIC):
+                 cost=fu.CostFunction.QUADRATIC,
+                 l2_reg_lambda=0.0):
         self.activation_fns = {
             'hidden': fu.ActivationFunction.get_activation_function(hidden_activation),
             'output': fu.ActivationFunction.get_activation_function(output_activation)
         }
         self.cost_fn = fu.CostFunction.get_cost_function(cost)
+        self.l2_reg_lambda = l2_reg_lambda
 
     def __str__(self):
         return f"Activations: {self.activation_fns}, Cost: {self.cost_fn}"
@@ -24,6 +26,7 @@ class NNet(object):
         self.layers = layers
         self.activation_fns = options.activation_fns
         self.cost_fn = options.cost_fn
+        self.l2_reg_lambda = options.l2_reg_lambda
 
         self._weights_initialization()
 
@@ -44,7 +47,7 @@ class NNet(object):
             np.random.shuffle(training_data)
             mini_batches = [training_data[k:k + batch_size] for k in range(0, n, batch_size)]
             for mini_batch in mini_batches:
-                self._update_mini_batch(mini_batch, learning_rate)
+                self._update_mini_batch(mini_batch, learning_rate, n)
 
             if test_data:
                 print(f"Epoch {j}: {self.evaluate(test_data)} / {n_test}")
@@ -170,7 +173,7 @@ class NNet(object):
             self.nabla_b[-l] += delta
             self.nabla_w[-l] += np.dot(delta, self.activations[-l - 1].T)
 
-    def _update_mini_batch(self, mini_batch, learning_rate):
+    def _update_mini_batch(self, mini_batch, learning_rate, training_size):
         """
         Update the network weights and biases using backpropagation.
         :param batch: Mini-batch of training data
@@ -192,5 +195,6 @@ class NNet(object):
         """
         3. update weights and biases
         """
-        self.weights = [w - (learning_rate / len(mini_batch)) * nw for w, nw in zip(self.weights, self.nabla_w)]
+        self.weights = [(1 - learning_rate * (self.l2_reg_lambda / training_size)) * w
+                        - (learning_rate / len(mini_batch)) * nw for w, nw in zip(self.weights, self.nabla_w)]
         self.biases = [b - (learning_rate / len(mini_batch)) * nb for b, nb in zip(self.biases, self.nabla_b)]
