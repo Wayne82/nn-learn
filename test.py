@@ -12,6 +12,6 @@ print("Evaluating an untrained network on test data:")
 print(net.accuracy(test_data))
 
 print("Training the network:")
-net.SGD(training_data, epochs=30, batch_size=10, learning_rate=0.1, test_data=test_data)
+net.SGD(training_data, epochs=30, batch_size=10, learning_rate=0.1, validation_data=validation_data)
 print("Evaluating the trained network on test data:")
 print(net.accuracy(test_data))

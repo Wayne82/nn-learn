@@ -30,17 +30,17 @@ class NNet(object):
 
         self._weights_initialization()
 
-    def SGD(self, training_data, epochs, batch_size, learning_rate=0.01, test_data=None):
+    def SGD(self, training_data, epochs, batch_size, learning_rate=0.01, validation_data=None):
         """
         Train the neural network using the provided training data.
         :param training_data: List of tuples (input, target)
         :param epochs: Number of epochs to train
         :param batch_size: Size of each training batch
         :param learning_rate: Learning rate for the optimizer
-        :param test_data: Optional test data for validation
+        :param validation_data: Optional test data for validation
         """
-        if test_data:
-            n_test = len(test_data)
+        if validation_data:
+            n_test = len(validation_data)
         n = len(training_data)
 
         for j in range(epochs):
@@ -49,8 +49,8 @@ class NNet(object):
             for mini_batch in mini_batches:
                 self._update_mini_batch(mini_batch, learning_rate, n)
 
-            if test_data:
-                print(f"Epoch {j}: {self.evaluate(test_data)} / {n_test}")
+            if validation_data:
+                print(f"Epoch {j}: {self.evaluate(validation_data)} / {n_test}")
             else:
                 print(f"Epoch {j} complete")
 
