@@ -135,35 +135,35 @@ class NNet(object):
         """
         Backpropagation algorithm to compute gradients.
         :param y: Target output
-        :return: Gradients of weights and biases
         """
 
         """
-        - Calculate the gradient of the cost function with respect to the output
-        of the network.
-
-        Apply equation (BP1) from the backpropagation algorithm
+        Calculate the gradient of the cost function with respect to
+        the output of the network.
+        Apply equation (BP1)
         """
-        delta = self.cost_fn.prime(y, self.activations[-1]) * self.activation_fns['output'].prime(self.zs[-1])
+        delta = self.cost_fn.prime(y, self.activations[-1]) * \
+                self.activation_fns['output'].prime(self.zs[-1])
         """
-        Apply equation (BP3) and (BP4) from the backpropagation algorithm
+        Apply equation (BP3) and (BP4)
         """
         self.nabla_b[-1] += delta
         self.nabla_w[-1] += np.dot(delta, self.activations[-2].T)
 
         """
-        - Backpropagate the gradient to the previous layers.
+        Iterate through the layers in reverse order to compute gradients
         """
         for l in range(2, self.size):
             z = self.zs[-l]
             sp = self.activation_fns['hidden'].prime(z)
+
             """
-            Apply equation (BP2) from the backpropagation algorithm
+            Apply equation (BP2)
             """
             delta = np.dot(self.weights[-l + 1].T, delta) * sp
 
             """
-            Apply equation (BP3) and (BP4) from the backpropagation algorithm
+            Apply equation (BP3) and (BP4)
             """
             self.nabla_b[-l] += delta
             self.nabla_w[-l] += np.dot(delta, self.activations[-l - 1].T)
