@@ -10,6 +10,13 @@ class NNetOptions:
                  output_activation=fu.ActivationFunction.SIGMOID,
                  cost=fu.CostFunction.QUADRATIC,
                  l2_reg_lambda=0.0):
+        """
+        Use different activation functions for hidden and output layers.
+        :param hidden_activation: Activation function for hidden layers
+        :param output_activation: Activation function for output layer
+        :param cost: Cost function to use
+        :param l2_reg_lambda: L2 regularization lambda
+        """
         self.activation_fns = {
             'hidden': fu.ActivationFunction.get_activation_function(hidden_activation),
             'output': fu.ActivationFunction.get_activation_function(output_activation)
@@ -173,6 +180,7 @@ class NNet(object):
         Update the network weights and biases using backpropagation.
         :param batch: Mini-batch of training data
         :param learning_rate: Learning rate for the optimizer
+        :param training_size: Total size of the training data
         """
         self.nabla_b = [np.zeros(b.shape) for b in self.biases]
         self.nabla_w = [np.zeros(w.shape) for w in self.weights]
@@ -189,6 +197,10 @@ class NNet(object):
 
         """
         3. update weights and biases
+        Notes:
+        - The weights are updated using the learning rate and the average of the gradients calcuated from the mini-batch.
+        - The L2 regularization term is applied to the weights, and average over the training size to normalize the update.
+        - The biases are updated similarly.
         """
         self.weights = [(1 - learning_rate * (self.l2_reg_lambda / training_size)) * w
                         - (learning_rate / len(mini_batch)) * nw for w, nw in zip(self.weights, self.nabla_w)]
