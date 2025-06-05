@@ -76,14 +76,22 @@ class Softmax:
     @staticmethod
     def fn(z):
         exp_z = np.exp(z - np.max(z))  # for numerical stability
-        return exp_z / np.sum(exp_z, axis=0, keepdims=True)
+        return exp_z / np.sum(exp_z)
 
     @staticmethod
     def prime(z):
         s = Softmax.fn(z)
-        return s * (1 - s)  # Simplified; for full Jacobian, use np.diag(s) - np.outer(s, s)
+        return np.diag(s) - np.outer(s, s)
+
+    @staticmethod
+    def initialize_weights_coefficient(x):
+        return np.sqrt(1.0 / x)
 
 class QuadraticLoss:
+    @staticmethod
+    def type():
+        return CostFunction.QUADRATIC
+
     @staticmethod
     def fn(y_true, y_pred):
         return 0.5 * np.sum((y_pred - y_true) ** 2)
@@ -94,9 +102,23 @@ class QuadraticLoss:
 
 class CrossEntropyLoss:
     @staticmethod
+    def type():
+        return CostFunction.CROSS_ENTROPY
+
+    @staticmethod
     def fn(y_true, y_pred):
         return -np.sum(y_true * np.log(y_pred + 1e-15))  # add small value to avoid log(0)
 
     @staticmethod
     def prime(y_true, y_pred):
         return -y_true / (y_pred + 1e-15)  # add small value to avoid division by zero
+
+    @staticmethod
+    def delta(y_true, y_pred):
+        """
+        Compute the gradient of the cross-entropy loss with respect to activations of the softmax layer.
+        :param y_true: True labels (one-hot encoded)
+        :param y_pred: Predicted probabilities from softmax
+        :return: Gradient of the loss with respect to activations of the softmax layer
+        """
+        return y_pred - y_true

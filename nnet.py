@@ -21,11 +21,16 @@ class NNetOptions:
             'hidden': fu.ActivationFunction.get_activation_function(hidden_activation),
             'output': fu.ActivationFunction.get_activation_function(output_activation)
         }
+        if hidden_activation == fu.ActivationFunction.SOFTMAX:
+            raise ValueError("Softmax activation function is not allowed in hidden layers.")
+        if output_activation == fu.ActivationFunction.SOFTMAX and cost != fu.CostFunction.CROSS_ENTROPY:
+            raise ValueError("Softmax activation function is only allowed with cross-entropy cost function.")
+
         self.cost_fn = fu.CostFunction.get_cost_function(cost)
         self.l2_reg_lambda = l2_reg_lambda
 
     def __str__(self):
-        return f"Activations: {self.activation_fns}, Cost: {self.cost_fn}"
+        return f"\n Activations: {self.activation_fns}, \n Cost: {self.cost_fn}, \n L2 Regularization: {self.l2_reg_lambda}"
 
 class NNet(object):
     def __init__(self, layers, options=NNetOptions()):
@@ -149,7 +154,10 @@ class NNet(object):
         the output of the network.
         Apply equation (BP1)
         """
-        delta = self.cost_fn.prime(y, self.activations[-1]) * \
+        if self.cost_fn.type() == fu.CostFunction.CROSS_ENTROPY:
+            delta = self.cost_fn.delta(y, self.activations[-1])
+        else:
+            delta = self.cost_fn.prime(y, self.activations[-1]) * \
                 self.activation_fns['output'].prime(self.zs[-1])
         """
         Apply equation (BP3) and (BP4)
