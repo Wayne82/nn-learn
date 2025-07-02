@@ -1,7 +1,6 @@
 
 import numpy as np
 
-
 class Conv2D:
     def __init__(self, in_channels, out_channels, kernel_size):
         self.in_channels = in_channels
@@ -39,7 +38,26 @@ class Conv2D:
         return out
 
     def backward(self, grad):
-        pass  # compute gradients and return grad to previous layer
+        """
+        grad shape: (C_out, H_out, W_out)
+        dx shape: (C_in, H_in, W_in)
+        """
+        _, H_in, W_in = self.x.shape
+        C_out, H_out, W_out = grad.shape
+        _, _, K, _ = self.W.shape
+
+        dx = np.zeros_like(self.x)
+
+        for c in range(C_out):
+            for h in range(H_out):
+                for w in range(W_out):
+                    local_region = self.x[:, h:h + K, w:w + K]
+                    self.dW[c] += local_region * grad[c, h, w]
+                    self.db[c] += grad[c, h, w]
+                    dx[:, h:h + K, w:w + K] += self.W[c] * grad[c, h, w]
+
+        return dx
 
     def update(self, lr, batch_size):
-        pass  # gradient descent step
+        self.W -= lr * self.dW / batch_size
+        self.b -= lr * self.db / batch_size
