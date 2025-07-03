@@ -61,3 +61,44 @@ class Conv2D:
     def update(self, lr, batch_size):
         self.W -= lr * self.dW / batch_size
         self.b -= lr * self.db / batch_size
+
+class ReLu:
+    def __init__(self):
+        self.x = None
+
+    def forward(self, x):
+        self.x = x
+        return np.maximum(0, x)
+
+    def backward(self, grad):
+        dx = grad * (self.x > 0)
+        return dx
+
+class MaxPool2D:
+    def __init__(self, pool_size=2, stride=2):
+        self.pool_size = pool_size
+        self.stride = stride
+        self.x = None
+        self.indices = None
+
+    def forward(self, x):
+        self.input = x
+        C, H_in, W_in = x.shape
+        H_out = (H_in - self.pool_size) // self.stride + 1
+        W_out = (W_in - self.pool_size) // self.stride + 1
+
+        out = np.zeros((C, H_out, W_out))
+        self.indices = np.zeros_like(x, dtype=bool)
+
+        for c in range(C):
+            for h in range(H_out):
+                for w in range(W_out):
+                    h_start = h * self.stride
+                    w_start = w * self.stride
+                    local_region = x[c, h_start:h_start + self.pool_size, w_start:w_start + self.pool_size]
+                    max_val = np.max(local_region)
+                    out[c, h, w] = max_val
+                    self.indices[c, h_start:h_start + self.pool_size,
+                                 w_start:w_start + self.pool_size] |= (local_region == max_val)
+
+        return out
