@@ -102,3 +102,18 @@ class MaxPool2D:
                                  w_start:w_start + self.pool_size] |= (local_region == max_val)
 
         return out
+
+    def backward(self, grad):
+        C, H_in, W_in = self.input.shape
+        dx = np.zeros_like(self.input)
+        out_h, out_w = grad.shape
+
+        for c in range(C):
+            for h in range(out_h):
+                for w in range(out_w):
+                    h_start = h * self.stride
+                    w_start = w * self.stride
+                    mask = self.indices[c, h_start:h_start + self.pool_size, w_start:w_start + self.pool_size]
+                    dx[c, h_start:h_start + self.pool_size, w_start:w_start + self.pool_size] += grad[c, h, w] * mask
+
+        return dx
