@@ -1,7 +1,20 @@
-
 import numpy as np
 from convnet_layers import CrossEntropyLoss
 from func_util import Softmax
+
+class ConvNetConfig:
+    """
+    Configuration class for ConvNet architecture and training parameters.
+    """
+    def __init__(
+        self,
+        batch_size=1,
+        learning_rate=0.01,
+        epochs=10
+    ):
+        self.batch_size = batch_size
+        self.learning_rate = learning_rate
+        self.epochs = epochs
 
 class ConvNet:
     def __init__(self, config=None):
@@ -19,6 +32,7 @@ class ConvNet:
     def add_layer(self, layer):
         """Add a layer to the network."""
         self.layers.append(layer)
+        return self
 
     def forward(self, x):
         for layer in self.layers:
