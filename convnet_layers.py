@@ -128,3 +128,32 @@ class Flatten:
 
     def backward(self, grad):
         return grad.reshape(self.x_shape)
+
+class FullyConnected:
+    def __init__(self, in_features, out_features):
+        self.in_features = in_features
+        self.out_features = out_features
+
+        # Initialize weights and biases
+        scale = np.sqrt(2.0 / in_features)
+        self.W = np.random.randn(out_features, in_features) * scale
+        self.b = np.zeros((out_features,))
+
+        # Buffer for gradients
+        self.x = None
+        self.dW = np.zeros_like(self.W)
+        self.db = np.zeros_like(self.b)
+
+    def forward(self, x):
+        self.x = x
+        return np.dot(self.W, x) + self.b
+
+    def backward(self, grad):
+        dx = np.dot(self.W.T, grad)
+        self.dW += np.dot(grad, self.x.T)
+        self.db += grad.sum(axis=1)
+        return dx
+
+    def update(self, lr, batch_size):
+        self.W -= lr * self.dW / batch_size
+        self.b -= lr * self.db / batch_size
