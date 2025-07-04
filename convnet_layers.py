@@ -117,3 +117,14 @@ class MaxPool2D:
                     dx[c, h_start:h_start + self.pool_size, w_start:w_start + self.pool_size] += grad[c, h, w] * mask
 
         return dx
+
+class Flatten:
+    def __init__(self):
+        self.x_shape = None
+
+    def forward(self, x):
+        self.x_shape = x.shape
+        return x.reshape(-1, 1)
+
+    def backward(self, grad):
+        return grad.reshape(self.x_shape)
