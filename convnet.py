@@ -49,6 +49,12 @@ class ConvNet:
             if hasattr(layer, 'update'):
                 layer.update(self.learning_rate, batch_size)
 
+    def zero_grad(self):
+        """Reset gradients for all layers."""
+        for layer in self.layers:
+            if hasattr(layer, 'zero_grad'):
+                layer.zero_grad()
+
     def predict(self, x):
         """Returns the predicted class for a single input sample."""
         out = self.forward(x)
@@ -76,6 +82,9 @@ class ConvNet:
             np.random.shuffle(train_data)
             for batch_start in range(0, num_samples, self.batch_size):
                 batch = train_data[batch_start:batch_start + self.batch_size]
+
+                # Reset gradients for the batch
+                self.zero_grad()
 
                 for x, y in batch:
                     # Forward pass

@@ -62,6 +62,14 @@ class Conv2D:
         self.W -= lr * self.dW / batch_size
         self.b -= lr * self.db / batch_size
 
+    def zero_grad(self):
+        """
+        Reset gradients to zero.
+        This is useful before starting a new batch.
+        """
+        self.dW.fill(0)
+        self.db.fill(0)
+
 class ReLu:
     def __init__(self):
         self.x = None
@@ -157,6 +165,14 @@ class FullyConnected:
     def update(self, lr, batch_size):
         self.W -= lr * self.dW / batch_size
         self.b -= lr * self.db / batch_size
+
+    def zero_grad(self):
+        """
+        Reset gradients to zero.
+        This is useful before starting a new batch.
+        """
+        self.dW.fill(0)
+        self.db.fill(0)
 
 class CrossEntropyLoss:
     def __init__(self):
