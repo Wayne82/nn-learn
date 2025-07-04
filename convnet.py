@@ -1,5 +1,7 @@
 
 import numpy as np
+from convnet_layers import CrossEntropyLoss
+from func_util import Softmax
 
 class ConvNet:
     def __init__(self, config=None):
@@ -11,7 +13,10 @@ class ConvNet:
         self.learning_rate = self.config.get('learning_rate', 0.01)
         self.epochs = self.config.get('epochs', 10)
 
-    def add(self, layer):
+        # Use cross entropy loss by default
+        self.loss_fn = CrossEntropyLoss()
+
+    def add_layer(self, layer):
         """Add a layer to the network."""
         self.layers.append(layer)
 
@@ -33,44 +38,45 @@ class ConvNet:
     def predict(self, x):
         """Returns the predicted class for a single input sample."""
         out = self.forward(x)
-        return np.argmax(out)
 
-    def evaluate(self, X, y):
-        """Evaluate accuracy and loss on a dataset."""
-        correct = 0
-        total_loss = 0
+        # Apply softmax to get probabilities
+        probs = Softmax.fn(out)
+        return np.argmax(probs)
 
-        for x_i, y_i in zip(X, y):
-            out = self.forward(x_i)
-            pred = np.argmax(out)
-            correct += int(pred == y_i)
+    def evaluate(self, validation_data):
+        """
+        Evaluate the model on the validation dataset.
+        returns the accuracy as a float.
+        """
+        results = [(self.predict(x), y) for x, y in validation_data]
+        return sum(int(y_pred == y_true) for y_pred, y_true in results) / len(results)
 
-            # Cross-entropy loss
-            loss = -np.log(out[y_i] + 1e-10)
-            total_loss += loss
+    def SGD(self, train_data, validation_data=None):
+        """
+        Stochastic Gradient Descent optimization.
+        """
+        num_samples = len(train_data)
+        loss_fn = self.loss_fn
 
-        accuracy = correct / len(X)
-        avg_loss = total_loss / len(X)
-        return accuracy, avg_loss
-
-    def SGD(self, X_train, y_train, X_val=None, y_val=None):
         for epoch in range(self.epochs):
+            np.random.shuffle(train_data)
+            for batch_start in range(0, num_samples, self.batch_size):
+                batch = train_data[batch_start:batch_start + self.batch_size]
 
-            indices = np.arange(len(X_train))
-            np.random.shuffle(indices)
+                for x, y in batch:
+                    # Forward pass
+                    out = self.forward(x)
 
-            for i in range(0, len(X_train), self.batch_size):
-                batch_indices = indices[i:i + self.batch_size]
-                X_batch = [X_train[j] for j in batch_indices]
-                y_batch = [y_train[j] for j in batch_indices]
+                    # Compute loss and gradients
+                    loss = loss_fn.forward(out, y)
+                    grad = loss_fn.backward(out, y)
 
-                for x_i, y_i in zip(X_batch, y_batch):
-                    self.forward(x_i)
+                    # Backward pass
+                    self.backward(grad)
 
-                    self.backward()
+                # Update weights
                 self.update(self.batch_size)
 
-            # Validation evaluation
-            if X_val is not None and y_val is not None:
-                val_acc, val_loss = self.evaluate(X_val, y_val)
-                print(f"Epoch {epoch + 1}: Val Loss = {val_loss:.4f}, Val Acc = {val_acc:.4f}")
+            if validation_data:
+                self.evaluate(validation_data)
+                print(f"Epoch {epoch + 1}/{self.epochs}, Validation Accuracy: {self.evaluate(validation_data):.4f}")
