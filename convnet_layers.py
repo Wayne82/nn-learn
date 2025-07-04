@@ -149,11 +149,46 @@ class FullyConnected:
         return np.dot(self.W, x) + self.b
 
     def backward(self, grad):
-        dx = np.dot(self.W.T, grad)
         self.dW += np.dot(grad, self.x.T)
-        self.db += grad.sum(axis=1)
+        self.db += grad
+        dx = np.dot(self.W.T, grad)
         return dx
 
     def update(self, lr, batch_size):
         self.W -= lr * self.dW / batch_size
         self.b -= lr * self.db / batch_size
+
+class CrossEntropyLoss:
+    def __init__(self):
+        '''
+        Initialize the CrossEntropyLoss layer.
+        This layer computes the cross-entropy loss and its gradients.
+        '''
+        self.logits = None
+        self.labels = None
+        self.probs = None
+
+    def forward(self, logits, labels):
+        self.logits = logits
+        self.labels = labels
+
+        # Compute softmax probabilities
+        exps = np.exp(logits - np.max(logits))
+        self.probs = exps / np.sum(exps)
+
+        # Add small value to avoid log(0)
+        probs = -np.log(self.probs + 1e-10)
+
+        # Compute cross-entropy loss
+        loss = np.sum(labels * probs)
+        return loss
+
+    def backward(self):
+        '''
+        Compute the gradient of the loss with respect to the logits.
+        :return: Gradient of the loss with respect to the logits.
+        '''
+        # ∂L/∂z = probs - target
+        # (same as gradient from softmax + cross-entropy combo)
+        grad = self.probs - self.labels
+        return grad
