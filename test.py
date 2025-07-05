@@ -3,6 +3,7 @@ import nnet
 import func_util as fu
 import mnist_loader
 from convnet import ConvNet, ConvNetConfig
+from convnet_layers import Conv2D, MaxPool2D, ReLu, Flatten, FullyConnected
 
 def test_nnet():
     training_data, validation_data, test_data = mnist_loader.load_data_wrapper()
@@ -24,8 +25,24 @@ def test_nnet():
     print(net.accuracy(test_data))
 
 def test_convnet():
-    print("To be implemented: ConvNet testing")
-    pass
+    training_data, validation_data, test_data = mnist_loader.load_data_wrapper_convnet()
+    config = ConvNetConfig(batch_size=10, learning_rate=0.1, epochs=5)
+    net = ConvNet(config)
+
+    # Add layers to the ConvNet
+    net.add_layer(Conv2D(in_channels=1, out_channels=8, kernel_size=3))\
+       .add_layer(ReLu())\
+       .add_layer(MaxPool2D(pool_size=2))\
+       .add_layer(Flatten())\
+       .add_layer(FullyConnected(in_features=8 * 13 * 13, out_features=10))
+
+    print("Network configuration:", config)
+    print("Evaluating an untrained ConvNet on test data:")
+    print(net.evaluate(test_data[:100]))
+    print("Training the ConvNet:")
+    net.SGD(training_data[:5000], validation_data=validation_data[:1000])
+    print("Evaluating the trained ConvNet on test data:")
+    print(net.evaluate(test_data[:1000]))
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

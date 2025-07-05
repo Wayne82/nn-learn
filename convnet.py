@@ -16,15 +16,21 @@ class ConvNetConfig:
         self.learning_rate = learning_rate
         self.epochs = epochs
 
+    def __str__(self):
+        return (
+            f"ConvNetConfig(batch_size={self.batch_size}, "
+            f"learning_rate={self.learning_rate}, epochs={self.epochs})"
+        )
+
 class ConvNet:
-    def __init__(self, config=None):
+    def __init__(self, config=ConvNetConfig()):
         self.config = config if config else {}
         self.layers = []
 
         # Optional configs
-        self.batch_size = self.config.get('batch_size', 1)
-        self.learning_rate = self.config.get('learning_rate', 0.01)
-        self.epochs = self.config.get('epochs', 10)
+        self.batch_size = self.config.batch_size
+        self.learning_rate = self.config.learning_rate
+        self.epochs = self.config.epochs
 
         # Use cross entropy loss by default
         self.loss_fn = CrossEntropyLoss()
@@ -92,7 +98,7 @@ class ConvNet:
 
                     # Compute loss and gradients
                     loss = loss_fn.forward(out, y)
-                    grad = loss_fn.backward(out, y)
+                    grad = loss_fn.backward()
 
                     # Backward pass
                     self.backward(grad)
@@ -101,5 +107,5 @@ class ConvNet:
                 self.update(self.batch_size)
 
             if validation_data:
-                self.evaluate(validation_data)
-                print(f"Epoch {epoch + 1}/{self.epochs}, Validation Accuracy: {self.evaluate(validation_data):.4f}")
+                acc = self.evaluate(validation_data)
+                print(f"Epoch {epoch + 1}/{self.epochs}, Validation Accuracy: {acc * 100:.2f}%")

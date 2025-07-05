@@ -113,7 +113,7 @@ class MaxPool2D:
     def backward(self, grad):
         C, H_in, W_in = self.input.shape
         dx = np.zeros_like(self.input)
-        out_h, out_w = grad.shape
+        _, out_h, out_w = grad.shape
 
         for c in range(C):
             for h in range(out_h):
@@ -144,7 +144,7 @@ class FullyConnected:
         # Initialize weights and biases
         scale = np.sqrt(2.0 / in_features)
         self.W = np.random.randn(out_features, in_features) * scale
-        self.b = np.zeros((out_features,))
+        self.b = np.random.randn(out_features, 1)
 
         # Buffer for gradients
         self.x = None
