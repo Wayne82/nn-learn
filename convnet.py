@@ -63,10 +63,11 @@ class ConvNet:
 
     def predict(self, x):
         """Returns the predicted class for a single input sample."""
-        out = self.forward(x)
+        x_batch = np.expand_dims(x, axis=0)  # Add batch dimension
+        out = self.forward(x_batch)
 
         # Apply softmax to get probabilities
-        probs = Softmax.fn(out)
+        probs = Softmax.fn(out[0])  # Get the first (and only) sample's output
         return np.argmax(probs)
 
     def evaluate(self, validation_data):
@@ -74,8 +75,25 @@ class ConvNet:
         Evaluate the model on the validation dataset.
         returns the accuracy as a float.
         """
-        results = [(self.predict(x), y) for x, y in validation_data]
-        return sum(int(y_pred == y_true) for y_pred, y_true in results) / len(results)
+        total = len(validation_data)
+        correct = 0
+
+        # Process in batches
+        batch_size = self.batch_size
+        for i in range(0, total, batch_size):
+            batch = validation_data[i:i + batch_size]
+            x_batch = np.stack([x for x, _ in batch], axis=0)
+            y_batch = [y for _, y in batch]
+
+            out = self.forward(x_batch)
+
+            # Apply softmax to get probabilities
+            for y_true, y_pred in zip(y_batch, out):
+                probs = Softmax.fn(y_pred)
+                if np.argmax(probs) == y_true:
+                    correct += 1
+
+        return correct / total if total > 0 else 0.0
 
     def SGD(self, train_data, validation_data=None):
         """
@@ -89,22 +107,25 @@ class ConvNet:
             for batch_start in range(0, num_samples, self.batch_size):
                 batch = train_data[batch_start:batch_start + self.batch_size]
 
+                # Prepare the batch data
+                x_batch = np.stack([x for x, _ in batch], axis=0)
+                y_batch = np.stack([y for _, y in batch], axis=0)
+
                 # Reset gradients for the batch
                 self.zero_grad()
 
-                for x, y in batch:
-                    # Forward pass
-                    out = self.forward(x)
+                # Forward pass - batched version
+                out = self.forward(x_batch)
 
-                    # Compute loss and gradients
-                    loss = loss_fn.forward(out, y)
-                    grad = loss_fn.backward()
+                # Compute loss and gradients - batched version
+                loss = loss_fn.forward(out, y_batch)
+                grad = loss_fn.backward()
 
-                    # Backward pass
-                    self.backward(grad)
+                # Backward pass - batched version
+                self.backward(grad)
 
                 # Update weights
-                self.update(self.batch_size)
+                self.update(len(batch))
 
             if validation_data:
                 acc = self.evaluate(validation_data)

@@ -9,7 +9,7 @@ class Conv2D:
         # Initialize weights and biases
         scale = np.sqrt(2.0 / (in_channels * kernel_size * kernel_size))
         self.W = np.random.randn(out_channels, in_channels, kernel_size, kernel_size) * scale
-        self.b = np.zeros((out_channels,))
+        self.b = np.random.randn(out_channels, 1)
 
         # Buffer for gradients
         self.x = None
@@ -18,42 +18,44 @@ class Conv2D:
 
     def forward(self, x):
         """
-        x shape: (C_in, H_in, W_in)
-        output shape: (C_out, H_out, W_out)
+        x shape: (B, C_in, H_in, W_in)
+        output shape: (B, C_out, H_out, W_out)
         """
         self.x = x
-        _, H_in, W_in = x.shape
+        B, _, H_in, W_in = x.shape
         C_out, _, kernel_size, _ = self.W.shape
         H_out = H_in - kernel_size + 1
         W_out = W_in - kernel_size + 1
-        out = np.zeros((C_out, H_out, W_out))
+        out = np.zeros((B, C_out, H_out, W_out))
 
-        for c in range(C_out):
-            for h in range(H_out):
-                for w in range(W_out):
-                    local_region = x[:, h:h + kernel_size, w:w + kernel_size]
-                    out[c, h, w] = np.sum(local_region * self.W[c]) + self.b[c]
+        for b in range(B):
+            for c in range(C_out):
+                for h in range(H_out):
+                    for w in range(W_out):
+                        local_region = x[b, :, h:h + kernel_size, w:w + kernel_size]
+                        out[b, c, h, w] = np.sum(local_region * self.W[c]) + self.b[c, 0]
 
         return out
 
     def backward(self, grad):
         """
-        grad shape: (C_out, H_out, W_out)
-        dx shape: (C_in, H_in, W_in)
+        grad shape: (B, C_out, H_out, W_out)
+        dx shape: (B, C_in, H_in, W_in)
         """
-        _, H_in, W_in = self.x.shape
-        C_out, H_out, W_out = grad.shape
-        _, _, K, _ = self.W.shape
+        B, _, H_in, W_in = self.x.shape
+        _, _, H_out, W_out = grad.shape
+        C_out, _, K, _ = self.W.shape
 
         dx = np.zeros_like(self.x)
 
-        for c in range(C_out):
-            for h in range(H_out):
-                for w in range(W_out):
-                    local_region = self.x[:, h:h + K, w:w + K]
-                    self.dW[c] += local_region * grad[c, h, w]
-                    self.db[c] += grad[c, h, w]
-                    dx[:, h:h + K, w:w + K] += self.W[c] * grad[c, h, w]
+        for b in range(B):
+            for c in range(C_out):
+                for h in range(H_out):
+                    for w in range(W_out):
+                        local_region = self.x[b, :, h:h + K, w:w + K]
+                        self.dW[c] += local_region * grad[b, c, h, w]
+                        self.db[c, 0] += grad[b, c, h, w]
+                        dx[b, :, h:h + K, w:w + K] += self.W[c] * grad[b, c, h, w]
 
         return dx
 
@@ -89,39 +91,52 @@ class MaxPool2D:
         self.indices = None
 
     def forward(self, x):
+        """
+        Forward pass for max pooling layer.
+        :param x: Input tensor of shape (B, C, H_in, W_in)
+        :return: Output tensor of shape (B, C, H_out, W_out)
+        """
         self.input = x
-        C, H_in, W_in = x.shape
+        B, C, H_in, W_in = x.shape
         H_out = (H_in - self.pool_size) // self.stride + 1
         W_out = (W_in - self.pool_size) // self.stride + 1
 
-        out = np.zeros((C, H_out, W_out))
+        out = np.zeros((B, C, H_out, W_out))
         self.indices = np.zeros_like(x, dtype=bool)
 
-        for c in range(C):
-            for h in range(H_out):
-                for w in range(W_out):
-                    h_start = h * self.stride
-                    w_start = w * self.stride
-                    local_region = x[c, h_start:h_start + self.pool_size, w_start:w_start + self.pool_size]
-                    max_val = np.max(local_region)
-                    out[c, h, w] = max_val
-                    self.indices[c, h_start:h_start + self.pool_size,
+        for b in range(B):
+            for c in range(C):
+                for h in range(H_out):
+                    for w in range(W_out):
+                        h_start = h * self.stride
+                        w_start = w * self.stride
+                        local_region = x[b, c, h_start:h_start + self.pool_size, w_start:w_start + self.pool_size]
+                        max_val = np.max(local_region)
+                        out[b, c, h, w] = max_val
+                        self.indices[b, c, h_start:h_start + self.pool_size,
                                  w_start:w_start + self.pool_size] |= (local_region == max_val)
 
         return out
 
     def backward(self, grad):
-        C, H_in, W_in = self.input.shape
-        dx = np.zeros_like(self.input)
-        _, out_h, out_w = grad.shape
+        """
+        Backward pass for max pooling layer.
+        :param grad: Gradient tensor of shape (B, C, H_out, W_out)
+        :return: Gradient tensor of shape (B, C, H_in, W_in)
+        """
+        B, C, H_in, W_in = self.input.shape
+        _, _, out_h, out_w = grad.shape
 
-        for c in range(C):
-            for h in range(out_h):
-                for w in range(out_w):
-                    h_start = h * self.stride
-                    w_start = w * self.stride
-                    mask = self.indices[c, h_start:h_start + self.pool_size, w_start:w_start + self.pool_size]
-                    dx[c, h_start:h_start + self.pool_size, w_start:w_start + self.pool_size] += grad[c, h, w] * mask
+        dx = np.zeros_like(self.input)
+
+        for b in range(B):
+            for c in range(C):
+                for h in range(out_h):
+                    for w in range(out_w):
+                        h_start = h * self.stride
+                        w_start = w * self.stride
+                        mask = self.indices[b, c, h_start:h_start + self.pool_size, w_start:w_start + self.pool_size]
+                        dx[b, c, h_start:h_start + self.pool_size, w_start:w_start + self.pool_size] += grad[b, c, h, w] * mask
 
         return dx
 
@@ -130,10 +145,21 @@ class Flatten:
         self.x_shape = None
 
     def forward(self, x):
+        """
+        This layer flattens the input tensor into a 2D array.
+        :param x: Input tensor of shape (B, C, H, W)
+        :return: Flattened tensor of shape (B, C * H * W, 1)
+        """
+        B, _, _, _ = x.shape
         self.x_shape = x.shape
-        return x.reshape(-1, 1)
+        return x.reshape(B, -1, 1)  # Reshape to (B, C * H * W, 1)
 
     def backward(self, grad):
+        """
+        This method reshapes the gradient back to the original input shape.
+        :param grad: Gradient tensor of shape (B, C * H * W, 1)
+        :return: Gradient reshaped to the original input shape (B, C, H, W)
+        """
         return grad.reshape(self.x_shape)
 
 class FullyConnected:
@@ -152,13 +178,28 @@ class FullyConnected:
         self.db = np.zeros_like(self.b)
 
     def forward(self, x):
+        """
+        Forward pass through the fully connected layer.
+        :param x: Input tensor of shape (B, in_features, 1)
+        :return: Output tensor of shape (B, out_features, 1)
+        """
         self.x = x
-        return np.dot(self.W, x) + self.b
+        # Remove the last dimension for matmul, then add it back
+        out = np.matmul(x[:, :, 0], self.W.T) + self.b.T  # (B, out_features)
+        return out[:, :, np.newaxis]  # (B, out_features, 1)
 
     def backward(self, grad):
-        self.dW += np.dot(grad, self.x.T)
-        self.db += grad
-        dx = np.dot(self.W.T, grad)
+        """
+        Backward pass through the fully connected layer.
+        :param grad: Gradient tensor of shape (B, out_features, 1)
+        :return: Gradient tensor of shape (B, in_features, 1)
+        """
+        B = grad.shape[0]
+        self.dW += np.sum(np.matmul(grad, self.x.transpose(0, 2, 1)), axis=0)  # Sum over batch dimension
+        self.db += np.sum(grad, axis=0)  # Sum over batch dimension
+
+        dx = np.matmul(grad[:, :, 0], self.W)  # (B, I)
+        dx = dx[:, :, np.newaxis]  # (B, I, 1)
         return dx
 
     def update(self, lr, batch_size):
@@ -184,26 +225,34 @@ class CrossEntropyLoss:
         self.probs = None
 
     def forward(self, logits, labels):
+        """
+        logits: (B, num_classes, 1)
+        labels: (B, num_classes, 1) for one-hot
+        Returns: scalar loss (average over batch)
+        """
+        # Remove last dimension if present
+        if logits.ndim == 3 and logits.shape[2] == 1:
+            logits = logits[:, :, 0]
+        if labels.ndim == 3 and labels.shape[2] == 1:
+            labels = labels[:, :, 0]
+
         self.logits = logits
         self.labels = labels
 
-        # Compute softmax probabilities
-        exps = np.exp(logits - np.max(logits))
-        self.probs = exps / np.sum(exps)
+        # Compute softmax probabilities for each sample in batch
+        exps = np.exp(logits - np.max(logits, axis=1, keepdims=True))
+        self.probs = exps / np.sum(exps, axis=1, keepdims=True)  # (B, num_classes)
 
-        # Add small value to avoid log(0)
-        probs = -np.log(self.probs + 1e-10)
-
-        # Compute cross-entropy loss
-        loss = np.sum(labels * probs)
-        return loss
+        # Compute cross-entropy loss for each sample, then average
+        log_probs = -np.log(self.probs + 1e-10)
+        loss = np.sum(labels * log_probs, axis=1)  # (B,)
+        return np.mean(loss)  # scalar
 
     def backward(self):
         '''
         Compute the gradient of the loss with respect to the logits.
-        :return: Gradient of the loss with respect to the logits.
+        :return: Gradient of the loss with respect to the logits, shape (B, num_classes, 1)
         '''
-        # ∂L/∂z = probs - target
-        # (same as gradient from softmax + cross-entropy combo)
-        grad = self.probs - self.labels
-        return grad
+        # Don't divide by B here - let the layer updates handle the averaging
+        grad = self.probs - self.labels  # (B, num_classes)
+        return grad[:, :, np.newaxis]  # (B, num_classes, 1)

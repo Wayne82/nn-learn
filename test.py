@@ -26,7 +26,7 @@ def test_nnet():
 
 def test_convnet():
     training_data, validation_data, test_data = mnist_loader.load_data_wrapper_convnet()
-    config = ConvNetConfig(batch_size=10, learning_rate=0.1, epochs=5)
+    config = ConvNetConfig(batch_size=10, learning_rate=0.1, epochs=15)
     net = ConvNet(config)
 
     # Add layers to the ConvNet
@@ -40,7 +40,7 @@ def test_convnet():
     print("Evaluating an untrained ConvNet on test data:")
     print(net.evaluate(test_data[:100]))
     print("Training the ConvNet:")
-    net.SGD(training_data[:5000], validation_data=validation_data[:1000])
+    net.SGD(training_data, validation_data=validation_data[:1000])
     print("Evaluating the trained ConvNet on test data:")
     print(net.evaluate(test_data[:1000]))
 
