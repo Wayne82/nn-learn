@@ -9,7 +9,7 @@ class Conv2D:
         # Initialize weights and biases
         scale = np.sqrt(2.0 / (in_channels * kernel_size * kernel_size))
         self.W = np.random.randn(out_channels, in_channels, kernel_size, kernel_size) * scale
-        self.b = np.random.randn(out_channels, 1)
+        self.b = np.zeros((out_channels, 1))
 
         # Buffer for gradients
         self.x = None
@@ -26,14 +26,18 @@ class Conv2D:
         C_out, _, kernel_size, _ = self.W.shape
         H_out = H_in - kernel_size + 1
         W_out = W_in - kernel_size + 1
-        out = np.zeros((B, C_out, H_out, W_out))
 
-        for b in range(B):
-            for c in range(C_out):
-                for h in range(H_out):
-                    for w in range(W_out):
-                        local_region = x[b, :, h:h + kernel_size, w:w + kernel_size]
-                        out[b, c, h, w] = np.sum(local_region * self.W[c]) + self.b[c, 0]
+        # Step 1: Unroll image patches into columns
+        self.x_cols = self._im2col(x, kernel_size)  # shape: (B, H_out*W_out, C*K*K)
+
+        # Step 2: Flatten filters to matrix: (C_out, C*K*K)
+        W_col = self.W.reshape(self.out_channels, -1)  # (C_out, C*K*K)
+
+        # Step 3: Matrix multiply and add bias
+        out = self.x_cols @ W_col.T + self.b.T  # (B, H_out*W_out, C_out)
+
+        # Step 4: Reshape to (B, C_out, H_out, W_out)
+        out = out.transpose(0, 2, 1).reshape(B, self.out_channels, H_out, W_out)
 
         return out
 
@@ -44,19 +48,24 @@ class Conv2D:
         """
         B, _, H_in, W_in = self.x.shape
         _, _, H_out, W_out = grad.shape
-        C_out, _, K, _ = self.W.shape
+        C_out, C_in, K, _ = self.W.shape
 
-        dx = np.zeros_like(self.x)
+        grad_flat = grad.reshape(B, C_out, -1).transpose(0, 2, 1)  # (B, H_out*W_out, C_out)
 
-        for b in range(B):
-            for c in range(C_out):
-                for h in range(H_out):
-                    for w in range(W_out):
-                        local_region = self.x[b, :, h:h + K, w:w + K]
-                        self.dW[c] += local_region * grad[b, c, h, w]
-                        self.db[c, 0] += grad[b, c, h, w]
-                        dx[b, :, h:h + K, w:w + K] += self.W[c] * grad[b, c, h, w]
+        # grad_flat: (B, H_out*W_out, C_out), x_cols: (B, H_out*W_out, C_in*K*K)
+        # dW_reshaped: (C_in*K*K, C_out)
+        # This performs: sum over batch and positions (B, H_out*W_out)
+        dW_reshaped = np.einsum('bic,bij->jc', grad_flat, self.x_cols)  # (C_in*K*K, C_out)
+        self.dW += dW_reshaped.T.reshape(C_out, C_in, K, K)  # Reshape back to filter shape
 
+        # db computation is already vectorized
+        self.db += np.sum(grad_flat, axis=(0, 1)).reshape(C_out, 1)
+
+        # Vectorized dx computation
+        W_col = self.W.reshape(C_out, -1)  # (C_out, C_in*K*K)
+        dx_cols = np.einsum('bic,cj->bij', grad_flat, W_col)  # (B, H_out*W_out, C_in*K*K)
+
+        dx = self._col2im(dx_cols)
         return dx
 
     def update(self, lr, batch_size):
@@ -70,6 +79,38 @@ class Conv2D:
         """
         self.dW.fill(0)
         self.db.fill(0)
+
+    def _im2col(self, x, K):
+        B, C, H, W = x.shape
+        H_out = H - K + 1
+        W_out = W - K + 1
+
+        # Pre-allocate the output array
+        cols = np.zeros((B, H_out * W_out, C * K * K))
+
+        for i in range(H_out):
+            for j in range(W_out):
+                patch = x[:, :, i:i+K, j:j+K]  # (B, C, K, K)
+                cols[:, i * W_out + j, :] = patch.reshape(B, -1)
+
+        return cols
+
+    def _col2im(self, dx_cols):
+        B, C_in, H_in, W_in = self.x.shape
+        K = self.kernel_size
+        H_out = H_in - K + 1
+        W_out = W_in - K + 1
+        dx = np.zeros((B, C_in, H_in, W_in))
+
+        for b in range(B):
+            col_idx = 0
+            for i in range(H_out):
+                for j in range(W_out):
+                    patch = dx_cols[b, col_idx].reshape(C_in, K, K)
+                    dx[b, :, i:i+K, j:j+K] += patch
+                    col_idx += 1
+
+        return dx
 
 class ReLu:
     def __init__(self):
