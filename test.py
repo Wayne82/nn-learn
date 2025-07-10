@@ -30,11 +30,25 @@ def test_convnet():
     net = ConvNet(config)
 
     # Add layers to the ConvNet
-    net.add_layer(Conv2D(in_channels=1, out_channels=8, kernel_size=3))\
-       .add_layer(ReLu())\
-       .add_layer(MaxPool2D(pool_size=2))\
-       .add_layer(Flatten())\
-       .add_layer(FullyConnected(in_features=8 * 13 * 13, out_features=10))
+    # net.add_layer(Conv2D(in_channels=1, out_channels=8, kernel_size=3, padding='same'))\
+    #    .add_layer(ReLu())\
+    #    .add_layer(MaxPool2D(pool_size=2))\
+    #    .add_layer(Flatten())\
+    #    .add_layer(FullyConnected(in_features=8 * 14 * 14, out_features=10))
+    net.add_layer(Conv2D(in_channels=1, out_channels=32, kernel_size=3, padding='same'))\
+        .add_layer(ReLu())\
+        .add_layer(Conv2D(in_channels=32, out_channels=32, kernel_size=3, padding='same'))\
+        .add_layer(ReLu())\
+        .add_layer(MaxPool2D(pool_size=2, stride=2))\
+        .add_layer(Conv2D(in_channels=32, out_channels=64, kernel_size=3, padding='same'))\
+        .add_layer(ReLu())\
+        .add_layer(Conv2D(in_channels=64, out_channels=64, kernel_size=3, padding='same'))\
+        .add_layer(ReLu())\
+        .add_layer(MaxPool2D(pool_size=2, stride=2))\
+        .add_layer(Flatten())\
+        .add_layer(FullyConnected(in_features=64 * 7 * 7, out_features=128))\
+        .add_layer(ReLu())\
+        .add_layer(FullyConnected(in_features=128, out_features=10))
 
     print("Network configuration:", config)
     print("Evaluating an untrained ConvNet on test data:")

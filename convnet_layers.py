@@ -1,10 +1,19 @@
 import numpy as np
 
 class Conv2D:
-    def __init__(self, in_channels, out_channels, kernel_size):
+    def __init__(self, in_channels, out_channels, kernel_size, padding='valid'):
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.kernel_size = kernel_size
+        self.padding = padding  # 'valid', 'same', or integer value
+
+        # Calculate padding values
+        if padding == 'same':
+            self.pad = (kernel_size - 1) // 2
+        elif padding == 'valid':
+            self.pad = 0
+        else:
+            self.pad = padding  # Assume integer value
 
         # Initialize weights and biases
         scale = np.sqrt(2.0 / (in_channels * kernel_size * kernel_size))
@@ -13,6 +22,7 @@ class Conv2D:
 
         # Buffer for gradients
         self.x = None
+        self.x_padded = None  # Store padded input for backward pass
         self.dW = np.zeros_like(self.W)
         self.db = np.zeros_like(self.b)
 
@@ -24,11 +34,21 @@ class Conv2D:
         self.x = x
         B, _, H_in, W_in = x.shape
         C_out, _, kernel_size, _ = self.W.shape
-        H_out = H_in - kernel_size + 1
-        W_out = W_in - kernel_size + 1
+
+        # Apply padding
+        if self.pad > 0:
+            self.x_padded = np.pad(x, ((0, 0), (0, 0), (self.pad, self.pad), (self.pad, self.pad)),
+                                 mode='constant', constant_values=0)
+        else:
+            self.x_padded = x
+
+        # Calculate output dimensions
+        H_padded, W_padded = self.x_padded.shape[2], self.x_padded.shape[3]
+        H_out = H_padded - kernel_size + 1
+        W_out = W_padded - kernel_size + 1
 
         # Step 1: Unroll image patches into columns
-        self.x_cols = self._im2col(x, kernel_size)  # shape: (B, H_out*W_out, C*K*K)
+        self.x_cols = self._im2col(self.x_padded, kernel_size)  # shape: (B, H_out*W_out, C*K*K)
 
         # Step 2: Flatten filters to matrix: (C_out, C*K*K)
         W_col = self.W.reshape(self.out_channels, -1)  # (C_out, C*K*K)
@@ -52,20 +72,24 @@ class Conv2D:
 
         grad_flat = grad.reshape(B, C_out, -1).transpose(0, 2, 1)  # (B, H_out*W_out, C_out)
 
-        # grad_flat: (B, H_out*W_out, C_out), x_cols: (B, H_out*W_out, C_in*K*K)
-        # dW_reshaped: (C_in*K*K, C_out)
-        # This performs: sum over batch and positions (B, H_out*W_out)
-        dW_reshaped = np.einsum('bic,bij->jc', grad_flat, self.x_cols)  # (C_in*K*K, C_out)
-        self.dW += dW_reshaped.T.reshape(C_out, C_in, K, K)  # Reshape back to filter shape
-
-        # db computation is already vectorized
+        # Gradient computation (same as before)
+        dW_reshaped = np.einsum('bic,bij->jc', grad_flat, self.x_cols)
+        self.dW += dW_reshaped.T.reshape(C_out, C_in, K, K)
         self.db += np.sum(grad_flat, axis=(0, 1)).reshape(C_out, 1)
 
         # Vectorized dx computation
-        W_col = self.W.reshape(C_out, -1)  # (C_out, C_in*K*K)
-        dx_cols = np.einsum('bic,cj->bij', grad_flat, W_col)  # (B, H_out*W_out, C_in*K*K)
+        W_col = self.W.reshape(C_out, -1)
+        dx_cols = np.einsum('bic,cj->bij', grad_flat, W_col)
 
-        dx = self._col2im(dx_cols)
+        # Convert back to image format (with padding)
+        dx_padded = self._col2im(dx_cols)
+
+        # Remove padding if it was applied
+        if self.pad > 0:
+            dx = dx_padded[:, :, self.pad:-self.pad, self.pad:-self.pad]
+        else:
+            dx = dx_padded
+
         return dx
 
     def update(self, lr, batch_size):
@@ -96,11 +120,12 @@ class Conv2D:
         return cols
 
     def _col2im(self, dx_cols):
-        B, C_in, H_in, W_in = self.x.shape
+        """Modified col2im to work with padded input"""
+        B, C_in, H_padded, W_padded = self.x_padded.shape
         K = self.kernel_size
-        H_out = H_in - K + 1
-        W_out = W_in - K + 1
-        dx = np.zeros((B, C_in, H_in, W_in))
+        H_out = H_padded - K + 1
+        W_out = W_padded - K + 1
+        dx = np.zeros((B, C_in, H_padded, W_padded))
 
         for b in range(B):
             col_idx = 0
