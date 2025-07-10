@@ -128,12 +128,12 @@ class MaxPool2D:
     def __init__(self, pool_size=2, stride=2):
         self.pool_size = pool_size
         self.stride = stride
-        self.x = None
-        self.indices = None
+        self.input = None
+        self.max_indices = None
 
     def forward(self, x):
         """
-        Forward pass for max pooling layer.
+        Ultra-fast forward pass using stride_tricks.
         :param x: Input tensor of shape (B, C, H_in, W_in)
         :return: Output tensor of shape (B, C, H_out, W_out)
         """
@@ -142,44 +142,88 @@ class MaxPool2D:
         H_out = (H_in - self.pool_size) // self.stride + 1
         W_out = (W_in - self.pool_size) // self.stride + 1
 
-        out = np.zeros((B, C, H_out, W_out))
-        self.indices = np.zeros_like(x, dtype=bool)
+        try:
+            # Use stride_tricks for maximum performance
+            from numpy.lib.stride_tricks import sliding_window_view
 
-        for b in range(B):
-            for c in range(C):
-                for h in range(H_out):
-                    for w in range(W_out):
-                        h_start = h * self.stride
-                        w_start = w * self.stride
-                        local_region = x[b, c, h_start:h_start + self.pool_size, w_start:w_start + self.pool_size]
-                        max_val = np.max(local_region)
-                        out[b, c, h, w] = max_val
-                        self.indices[b, c, h_start:h_start + self.pool_size,
-                                 w_start:w_start + self.pool_size] |= (local_region == max_val)
+            # Create sliding windows
+            windows = sliding_window_view(x, (self.pool_size, self.pool_size), axis=(2, 3))
+            # Shape: (B, C, H_out, W_out, pool_size, pool_size)
 
-        return out
+            # Take every stride-th window
+            windows = windows[:, :, ::self.stride, ::self.stride]
+
+            # Flatten pool dimensions and find max
+            windows_flat = windows.reshape(B, C, H_out, W_out, -1)
+            max_vals = np.max(windows_flat, axis=-1)
+            max_indices = np.argmax(windows_flat, axis=-1)
+
+            # Store for backward pass
+            self.max_indices = max_indices
+            self.windows_shape = (H_out, W_out)
+
+            return max_vals
+
+        except ImportError:
+            # Fallback to im2col method
+            return self._forward_im2col(x, H_out, W_out)
 
     def backward(self, grad):
         """
-        Backward pass for max pooling layer.
+        Optimized backward pass.
         :param grad: Gradient tensor of shape (B, C, H_out, W_out)
         :return: Gradient tensor of shape (B, C, H_in, W_in)
         """
         B, C, H_in, W_in = self.input.shape
-        _, _, out_h, out_w = grad.shape
+        _, _, H_out, W_out = grad.shape
 
         dx = np.zeros_like(self.input)
 
-        for b in range(B):
-            for c in range(C):
-                for h in range(out_h):
-                    for w in range(out_w):
-                        h_start = h * self.stride
-                        w_start = w * self.stride
-                        mask = self.indices[b, c, h_start:h_start + self.pool_size, w_start:w_start + self.pool_size]
-                        dx[b, c, h_start:h_start + self.pool_size, w_start:w_start + self.pool_size] += grad[b, c, h, w] * mask
+        # Vectorized backward pass
+        for h in range(H_out):
+            for w in range(W_out):
+                h_start = h * self.stride
+                w_start = w * self.stride
+
+                # Get max indices for this output position
+                max_idx = self.max_indices[:, :, h, w]  # (B, C)
+
+                # Convert to 2D coordinates
+                max_h = max_idx // self.pool_size
+                max_w = max_idx % self.pool_size
+
+                # Vectorized gradient assignment
+                batch_idx = np.arange(B)[:, None]  # (B, 1)
+                channel_idx = np.arange(C)[None, :]  # (1, C)
+
+                h_coords = h_start + max_h
+                w_coords = w_start + max_w
+
+                dx[batch_idx, channel_idx, h_coords, w_coords] += grad[:, :, h, w]
 
         return dx
+
+    def _forward_im2col(self, x, H_out, W_out):
+        """Fallback im2col implementation"""
+        B, C, H_in, W_in = x.shape
+
+        # Extract windows more efficiently
+        windows = np.zeros((B, C, H_out, W_out, self.pool_size * self.pool_size))
+
+        for h in range(H_out):
+            for w in range(W_out):
+                h_start = h * self.stride
+                w_start = w * self.stride
+
+                window = x[:, :, h_start:h_start + self.pool_size, w_start:w_start + self.pool_size]
+                windows[:, :, h, w, :] = window.reshape(B, C, -1)
+
+        # Find max values and indices
+        max_vals = np.max(windows, axis=-1)
+        max_indices = np.argmax(windows, axis=-1)
+
+        self.max_indices = max_indices
+        return max_vals
 
 class Flatten:
     def __init__(self):

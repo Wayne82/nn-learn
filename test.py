@@ -26,15 +26,15 @@ def test_nnet():
 
 def test_convnet():
     training_data, validation_data, test_data = mnist_loader.load_data_wrapper_convnet()
-    config = ConvNetConfig(batch_size=10, learning_rate=0.05, epochs=15)
+    config = ConvNetConfig(batch_size=10, learning_rate=0.08, epochs=30)
     net = ConvNet(config)
 
     # Add layers to the ConvNet
-    net.add_layer(Conv2D(in_channels=1, out_channels=4, kernel_size=3))\
+    net.add_layer(Conv2D(in_channels=1, out_channels=8, kernel_size=3))\
        .add_layer(ReLu())\
        .add_layer(MaxPool2D(pool_size=2))\
        .add_layer(Flatten())\
-       .add_layer(FullyConnected(in_features=4 * 13 * 13, out_features=10))
+       .add_layer(FullyConnected(in_features=8 * 13 * 13, out_features=10))
 
     print("Network configuration:", config)
     print("Evaluating an untrained ConvNet on test data:")
