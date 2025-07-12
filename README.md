@@ -5,6 +5,8 @@ The goal is to implement a basic neural network from scratch to gain a deep unde
 
 And here is my blog post about this learning - [Neural Network Notes: Coding the Network from Scratch](https://wayne82.github.io/neural-network/2025/06/01/Neural-Network-Notes-Coding-the-Network-from-Scratch.html)
 
+Furthermore, another blog about coding a Convolutional Neural Network (CNN) is also available - [Neural Network Notes: Coding CNN](https://wayne82.github.io/neural-network/2025/07/12/Neural-Network-Notes-Coding-CNN.html).
+
 ## Dependencies
 * Python > 3
 * numpy = 2.0.2
