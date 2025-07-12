@@ -280,7 +280,7 @@ class FullyConnected:
         # Initialize weights and biases
         scale = np.sqrt(2.0 / in_features)
         self.W = np.random.randn(out_features, in_features) * scale
-        self.b = np.random.randn(out_features, 1)
+        self.b = np.zeros((out_features, 1))
 
         # Buffer for gradients
         self.x = None
