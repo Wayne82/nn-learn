@@ -24,31 +24,38 @@ def test_nnet():
     print("Evaluating the trained network on test data:")
     print(net.accuracy(test_data))
 
-def test_convnet():
+def test_convnet(architecture='simple'):
     training_data, validation_data, test_data = mnist_loader.load_data_wrapper_convnet()
-    config = ConvNetConfig(batch_size=10, learning_rate=0.08, epochs=30)
+    config = ConvNetConfig(batch_size=10, learning_rate=0.05, epochs=30)
     net = ConvNet(config)
 
-    # Add layers to the ConvNet
-    # net.add_layer(Conv2D(in_channels=1, out_channels=8, kernel_size=3, padding='same'))\
-    #    .add_layer(ReLu())\
-    #    .add_layer(MaxPool2D(pool_size=2))\
-    #    .add_layer(Flatten())\
-    #    .add_layer(FullyConnected(in_features=8 * 14 * 14, out_features=10))
-    net.add_layer(Conv2D(in_channels=1, out_channels=32, kernel_size=3, padding='same'))\
-        .add_layer(ReLu())\
-        .add_layer(Conv2D(in_channels=32, out_channels=32, kernel_size=3, padding='same'))\
-        .add_layer(ReLu())\
-        .add_layer(MaxPool2D(pool_size=2, stride=2))\
-        .add_layer(Conv2D(in_channels=32, out_channels=64, kernel_size=3, padding='same'))\
-        .add_layer(ReLu())\
-        .add_layer(Conv2D(in_channels=64, out_channels=64, kernel_size=3, padding='same'))\
-        .add_layer(ReLu())\
-        .add_layer(MaxPool2D(pool_size=2, stride=2))\
-        .add_layer(Flatten())\
-        .add_layer(FullyConnected(in_features=64 * 7 * 7, out_features=128))\
-        .add_layer(ReLu())\
-        .add_layer(FullyConnected(in_features=128, out_features=10))
+    if architecture.lower() == 'simple':
+        # Simple CNN architecture
+        net.add_layer(Conv2D(in_channels=1, out_channels=8, kernel_size=3, padding='same'))\
+           .add_layer(ReLu())\
+           .add_layer(MaxPool2D(pool_size=2))\
+           .add_layer(Flatten())\
+           .add_layer(FullyConnected(in_features=8 * 14 * 14, out_features=10))
+        print("Using Simple CNN architecture")
+    elif architecture.lower() == 'complex':
+        # Complex CNN architecture
+        net.add_layer(Conv2D(in_channels=1, out_channels=32, kernel_size=3, padding='same'))\
+            .add_layer(ReLu())\
+            .add_layer(Conv2D(in_channels=32, out_channels=32, kernel_size=3, padding='same'))\
+            .add_layer(ReLu())\
+            .add_layer(MaxPool2D(pool_size=2, stride=2))\
+            .add_layer(Conv2D(in_channels=32, out_channels=64, kernel_size=3, padding='same'))\
+            .add_layer(ReLu())\
+            .add_layer(Conv2D(in_channels=64, out_channels=64, kernel_size=3, padding='same'))\
+            .add_layer(ReLu())\
+            .add_layer(MaxPool2D(pool_size=2, stride=2))\
+            .add_layer(Flatten())\
+            .add_layer(FullyConnected(in_features=64 * 7 * 7, out_features=128))\
+            .add_layer(ReLu())\
+            .add_layer(FullyConnected(in_features=128, out_features=10))
+        print("Using Complex CNN architecture")
+    else:
+        raise ValueError("Architecture must be 'simple' or 'complex'")
 
     print("Network configuration:", config)
     print("Evaluating an untrained ConvNet on test data:")
@@ -60,12 +67,17 @@ def test_convnet():
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python test.py [nnet|convnet]")
+        print("Usage: python test.py [nnet|convnet] [simple|complex]")
         sys.exit(1)
     test_type = sys.argv[1].lower()
     if test_type == "nnet":
         test_nnet()
     elif test_type == "convnet":
-        test_convnet()
+        # Check for architecture parameter
+        architecture = 'simple'  # default
+        if len(sys.argv) > 2:
+            architecture = sys.argv[2].lower()
+        test_convnet(architecture)
     else:
         print("Unknown test type. Use 'nnet' or 'convnet'.")
+        print("For convnet, you can optionally specify 'simple' or 'complex' architecture.")
