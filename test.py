@@ -1,9 +1,12 @@
 import sys
+
+import torch
 import nnet
 import func_util as fu
 import mnist_loader
 from convnet import ConvNet, ConvNetConfig
 from convnet_layers import Conv2D, MaxPool2D, ReLu, Flatten, FullyConnected
+from gpt_transformer import DataLoader, GPTTransformer, Trainer
 
 def test_nnet():
     training_data, validation_data, test_data = mnist_loader.load_data_wrapper()
@@ -65,9 +68,31 @@ def test_convnet(architecture='simple'):
     print("Evaluating the trained ConvNet on test data:")
     print(net.evaluate(test_data))
 
+def test_gpt_transformer():
+
+    # Load data
+    data_loader = DataLoader('./data/shijing.txt', batch_size=16)
+    data_loader.load_data()
+    # data_loader.print_samples(n=200)
+
+    # Initialize model
+    model = GPTTransformer(vocab_size=data_loader.get_vocab_size(), n_embd=64, n_head=4, n_layer=2)
+    model.print_params()
+
+    # Initialize trainer
+    trainer = Trainer(data_loader, model, learning_rate=1e-3)
+
+    # Train the model
+    trainer.train(max_iters=5000)
+
+    # Generate text
+    context = torch.zeros((1, 1), dtype=torch.long)
+    generated = trainer.generate(context, max_new_tokens=100)
+    print("Generated text:", data_loader.decode(generated[0].tolist()))
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python test.py [nnet|convnet] [simple|complex]")
+        print("Usage: python test.py [nnet|convnet|gpt_transformer] [simple|complex]")
         sys.exit(1)
     test_type = sys.argv[1].lower()
     if test_type == "nnet":
@@ -78,6 +103,8 @@ if __name__ == "__main__":
         if len(sys.argv) > 2:
             architecture = sys.argv[2].lower()
         test_convnet(architecture)
+    elif test_type == "gpt_transformer":
+        test_gpt_transformer()
     else:
-        print("Unknown test type. Use 'nnet' or 'convnet'.")
+        print("Unknown test type. Use 'nnet', 'convnet', or 'gpt_transformer'.")
         print("For convnet, you can optionally specify 'simple' or 'complex' architecture.")
