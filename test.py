@@ -71,12 +71,17 @@ def test_convnet(architecture='simple'):
 def test_gpt_transformer():
 
     # Load data
-    data_loader = DataLoader('./data/shijing.txt', batch_size=16)
+    data_loader = DataLoader('./data/classical_corpus_simplified.txt', batch_size=16)
     data_loader.load_data()
-    # data_loader.print_samples(n=200)
+    data_loader.print_samples(n=200)
 
-    # Initialize model
-    model = GPTTransformer(vocab_size=data_loader.get_vocab_size(), n_embd=64, n_head=4, n_layer=2)
+    # Initialize model (reduced size for small dataset)
+    model = GPTTransformer(vocab_size=data_loader.get_vocab_size(),
+                           block_size=32,
+                           n_embd=32,
+                           n_head=4,
+                           n_layer=4,
+                           dropout=0.1)
     model.print_params()
 
     # Initialize trainer
@@ -87,7 +92,7 @@ def test_gpt_transformer():
 
     # Generate text
     context = torch.zeros((1, 1), dtype=torch.long)
-    generated = trainer.generate(context, max_new_tokens=100)
+    generated = trainer.generate(context, max_new_tokens=200)
     print("Generated text:", data_loader.decode(generated[0].tolist()))
 
 if __name__ == "__main__":

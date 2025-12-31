@@ -2,9 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# Hyperparameters
-block_size = 64
-
 eval_iters = 200
 eval_interval = 500
 
@@ -15,13 +12,14 @@ torch.manual_seed(42)
 
 # Define the simple GPT transformer model
 class GPTTransformer(nn.Module):
-    def __init__(self, vocab_size, n_embd=64, n_head=1, n_layer=1):
+    def __init__(self, vocab_size, block_size=8, n_embd=64, n_head=1, n_layer=1, dropout=0.1):
         super().__init__()
-
+        self.block_size = block_size
         # Define layers
         self.token_embedding = nn.Embedding(vocab_size, n_embd)
         self.position_embedding = nn.Embedding(block_size, n_embd)
-        self.blocks = nn.Sequential(*[Block(n_embd, n_head) for _ in range(n_layer)])
+        self.dropout = nn.Dropout(dropout)
+        self.blocks = nn.Sequential(*[Block(n_embd, n_head, dropout, block_size) for _ in range(n_layer)])
         self.ln_f = nn.LayerNorm(n_embd)
         self.lm_head = nn.Linear(n_embd, vocab_size)
 
@@ -32,6 +30,7 @@ class GPTTransformer(nn.Module):
         token_embd = self.token_embedding(x) # (B, T, n_embd)
         position_embd = self.position_embedding(torch.arange(T, device=device)) # (T, n_embd)
         x = token_embd + position_embd #(B, T, n_embd)
+        x = self.dropout(x) #(B, T, n_embd)
         x = self.blocks(x) #(B, T, n_embd)
         x = self.ln_f(x) #(B, T, n_embd)
         logits = self.lm_head(x) #(B, T, vocab_size)
@@ -42,12 +41,11 @@ class GPTTransformer(nn.Module):
         print(sum(p.numel() for p in self.parameters())/1e6, 'M parameters')
 
 class Block(nn.Module):
-    def __init__(self, n_embd, n_head):
+    def __init__(self, n_embd, n_head, dropout=0.1, block_size=8):
         super().__init__()
-
         head_size = n_embd // n_head
-        self.sa = MultiHeadAttention(n_head, head_size, n_embd)
-        self.ff = FeedForward(n_embd)
+        self.sa = MultiHeadAttention(n_head, head_size, n_embd, dropout, block_size)
+        self.ff = FeedForward(n_embd, dropout)
         self.ln1 = nn.LayerNorm(n_embd)
         self.ln2 = nn.LayerNorm(n_embd)
 
@@ -56,25 +54,29 @@ class Block(nn.Module):
         x = self.ff(self.ln2(x)) + x
         return x
 
+
 class MultiHeadAttention(nn.Module):
-    def __init__(self, n_head, head_size, n_embd):
+    def __init__(self, n_head, head_size, n_embd, dropout=0.1, block_size=8):
         super().__init__()
-        self.heads = nn.ModuleList([Head(head_size, n_embd) for _ in range(n_head)])
-        self.proj = nn.Linear(n_embd, n_embd)
+        self.heads = nn.ModuleList([Head(head_size, n_embd, dropout, block_size) for _ in range(n_head)])
+        self.proj = nn.Linear(n_head * head_size, n_embd)
+        self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
         out = torch.cat([h(x) for h in self.heads], dim=-1)
         out = self.proj(out)
+        out = self.dropout(out)
         return out
 
 class Head(nn.Module):
-    def __init__(self, head_size, n_embd):
+    def __init__(self, head_size, n_embd, dropout=0.1, block_size=8):
         super().__init__()
         self.head_size = head_size
         self.key = nn.Linear(n_embd, head_size, bias=False)
         self.query = nn.Linear(n_embd, head_size, bias=False)
         self.value = nn.Linear(n_embd, head_size, bias=False)
         self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)))
+        self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
         B, T, C = x.shape
@@ -84,16 +86,19 @@ class Head(nn.Module):
         wei = q @ k.transpose(-2, -1) * self.head_size**-0.5 # (B, T, head_size) @ (B, head_size, T) -> (B, T, T)
         wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf')) # (B, T, T)
         wei = F.softmax(wei, dim=-1) # (B, T, T)
+        wei = self.dropout(wei)
         out = wei @ v # (B, T, head_size)
         return out
 
 class FeedForward(nn.Module):
-    def __init__(self, n_embd):
+    def __init__(self, n_embd, dropout=0.1):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(n_embd, 4 * n_embd),
             nn.ReLU(),
-            nn.Linear(4 * n_embd, n_embd)
+            nn.Dropout(dropout),
+            nn.Linear(4 * n_embd, n_embd),
+            nn.Dropout(dropout)
         )
 
     def forward(self, x):
@@ -102,11 +107,12 @@ class FeedForward(nn.Module):
 # Define the trainer class
 class Trainer():
     def __init__(self, data_loader, model, learning_rate=1e-3):
+        self.block_size = model.block_size
         self.data_loader = data_loader
         self.model = model.to(device)
         self.train_data = data_loader.train_data
         self.val_data = data_loader.val_data
-        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
+        self.optimizer = torch.optim.AdamW(self.model.parameters(), weight_decay=0.01, lr=learning_rate)
 
     def train(self, max_iters = 5000):
         # Train the model
@@ -118,7 +124,7 @@ class Trainer():
                 print(f"Step {iter}: train loss {train_loss:.4f}, val loss {val_loss:.4f}")
 
             # Get batch of samples
-            xb, yb = self.data_loader.get_batch('train')
+            xb, yb = self.data_loader.get_batch('train', self.block_size)
 
             # Forward pass
             logits = self.model(xb)
@@ -146,7 +152,7 @@ class Trainer():
         for split in ['train', 'val']:
             losses = torch.zeros(eval_iters)
             for k in range(eval_iters):
-                xb, yb = self.data_loader.get_batch(split)
+                xb, yb = self.data_loader.get_batch(split, self.block_size)
                 logits = self.model(xb)
                 loss = self.compute_loss(logits, yb)
                 losses[k] = loss.item()
@@ -159,7 +165,7 @@ class Trainer():
         x = x.to(device)
         # Generate new tokens
         for _ in range(max_new_tokens):
-            idx = x[:, -block_size:]
+            idx = x[:, -self.block_size:]
             logits = self.model(idx)
             logits = logits[:, -1, :] # (B, C)
             probs = F.softmax(logits, dim=-1) # (B, C)
@@ -192,7 +198,7 @@ class DataLoader():
         self.train_data = self.data[:n]
         self.val_data = self.data[n:]
 
-    def get_batch(self, split):
+    def get_batch(self, split, block_size):
         # Get a batch of data
         _data = self.train_data if split == 'train' else self.val_data
         ix = torch.randint(0, len(_data) - block_size, (self.batch_size,))
@@ -207,4 +213,5 @@ class DataLoader():
 
     def print_samples(self, n=100):
         # Print sample data
-        print(self.decode(self.val_data[:n].tolist()))
+        print("vocab size:", self.vocab_size)
+        print("sample data:", self.decode(self.data[:n].tolist()))
