@@ -68,8 +68,7 @@ def test_convnet(architecture='simple'):
     print("Evaluating the trained ConvNet on test data:")
     print(net.evaluate(test_data))
 
-def test_gpt_transformer():
-
+def test_gpt_transformer(save_path=None, load_path=None, train_model=True, check_model_params=False):
     # Load data
     data_loader = DataLoader('./data/classical_corpus_simplified.txt', batch_size=16)
     data_loader.load_data()
@@ -78,39 +77,70 @@ def test_gpt_transformer():
 
     # Initialize model (reduced size for small dataset)
     model = GPTTransformer(vocab_size=data_loader.get_vocab_size(),
-                           block_size=128,
+                           block_size=16,
                            n_embd=48,
                            n_head=6,
                            n_layer=6,
                            dropout=0.1)
     model.print_params()
+    if check_model_params:
+        return
 
-    # Initialize trainer
-    trainer = Trainer(data_loader, model, learning_rate=1e-3)
+    if load_path:
+        print(f"Loading model parameters from {load_path}")
+        model.load_model(load_path)
 
-    # Train the model
-    trainer.train(max_iters=20000)
+    if train_model:
+        # Initialize trainer
+        trainer = Trainer(data_loader, model, learning_rate=1e-3)
+        # Train the model
+        trainer.train(max_iters=20000)
+        if save_path:
+            print(f"Saving model parameters to {save_path}")
+            model.save_model(save_path)
 
     # Generate text
     context = torch.zeros((1, 1), dtype=torch.long)
-    generated = trainer.generate(context, max_new_tokens=200)
+    generated = model.generate(context, max_new_tokens=200)
     print("Generated text:", data_loader.decode(generated[0].tolist()))
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python test.py [nnet|convnet|gpt_transformer] [simple|complex]")
+        print("Usage: python test.py [nnet|convnet|gpt_transformer] [simple|complex] [save_path] [load_path] [train_model] [check_model_params]")
         sys.exit(1)
-    test_type = sys.argv[1].lower()
-    if test_type == "nnet":
+    model_type = sys.argv[1].lower()
+    print(f"Testing model type: {model_type}")
+    if model_type == "nnet":
         test_nnet()
-    elif test_type == "convnet":
-        # Check for architecture parameter
+    elif model_type == "convnet":
         architecture = 'simple'  # default
         if len(sys.argv) > 2:
             architecture = sys.argv[2].lower()
         test_convnet(architecture)
-    elif test_type == "gpt_transformer":
-        test_gpt_transformer()
+    elif model_type == "gpt_transformer":
+        # Default values
+        params = {
+            'save_path': None,
+            'load_path': None,
+            'train_model': True,
+            'check_model_params': False
+        }
+        # Parse key=value pairs
+        for arg in sys.argv[2:]:
+            if '=' in arg:
+                key, value = arg.split('=', 1)
+                key = key.strip()
+                value = value.strip()
+                if key in ['train_model', 'check_model_params']:
+                    params[key] = value.lower() == 'true'
+                else:
+                    params[key] = value
+        test_gpt_transformer(
+            save_path=params['save_path'],
+            load_path=params['load_path'],
+            train_model=params['train_model'],
+            check_model_params=params['check_model_params']
+        )
     else:
         print("Unknown test type. Use 'nnet', 'convnet', or 'gpt_transformer'.")
         print("For convnet, you can optionally specify 'simple' or 'complex' architecture.")

@@ -6,7 +6,6 @@ eval_iters = 200
 eval_interval = 500
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-print("Using device:", device)
 
 torch.manual_seed(42)
 
@@ -37,8 +36,28 @@ class GPTTransformer(nn.Module):
 
         return logits
 
+    @torch.no_grad()
+    def generate(self, x, max_new_tokens):
+        x = x.to(device)
+        for _ in range(max_new_tokens):
+            idx = x[:, -self.block_size:]
+            logits = self(idx)
+            logits = logits[:, -1, :] # (B, C)
+            probs = F.softmax(logits, dim=-1) # (B, C)
+            next_token = torch.multinomial(probs, num_samples=1) # (B, 1)
+            x = torch.cat((x, next_token), dim=1) # (B, T+1)
+        return x
+
     def print_params(self):
         print(sum(p.numel() for p in self.parameters())/1e6, 'M parameters')
+
+    def save_model(self, path):
+        """Save model parameters to the given path."""
+        torch.save(self.state_dict(), path)
+
+    def load_model(self, path, map_location=None):
+        """Load model parameters from the given path."""
+        self.load_state_dict(torch.load(path, map_location=map_location))
 
 class Block(nn.Module):
     def __init__(self, n_embd, n_head, dropout=0.1, block_size=8):
@@ -107,8 +126,8 @@ class FeedForward(nn.Module):
 # Define the trainer class
 class Trainer():
     def __init__(self, data_loader, model, learning_rate=1e-3):
-        self.block_size = model.block_size
         self.data_loader = data_loader
+        print("Using device:", device)
         self.model = model.to(device)
         self.train_data = data_loader.train_data
         self.val_data = data_loader.val_data
@@ -124,7 +143,7 @@ class Trainer():
                 print(f"Step {iter}: train loss {train_loss:.4f}, val loss {val_loss:.4f}")
 
             # Get batch of samples
-            xb, yb = self.data_loader.get_batch('train', self.block_size)
+            xb, yb = self.data_loader.get_batch('train', self.model.block_size)
 
             # Forward pass
             logits = self.model(xb)
@@ -152,7 +171,7 @@ class Trainer():
         for split in ['train', 'val']:
             losses = torch.zeros(eval_iters)
             for k in range(eval_iters):
-                xb, yb = self.data_loader.get_batch(split, self.block_size)
+                xb, yb = self.data_loader.get_batch(split, self.model.block_size)
                 logits = self.model(xb)
                 loss = self.compute_loss(logits, yb)
                 losses[k] = loss.item()
@@ -160,18 +179,6 @@ class Trainer():
         self.model.train()
         return out['train'], out['val']
 
-    @torch.no_grad()
-    def generate(self, x, max_new_tokens):
-        x = x.to(device)
-        # Generate new tokens
-        for _ in range(max_new_tokens):
-            idx = x[:, -self.block_size:]
-            logits = self.model(idx)
-            logits = logits[:, -1, :] # (B, C)
-            probs = F.softmax(logits, dim=-1) # (B, C)
-            next_token = torch.multinomial(probs, num_samples=1) # (B, 1)
-            x = torch.cat((x, next_token), dim=1) # (B, T+1)
-        return x
 
 # Define the data loader class
 class DataLoader():
