@@ -184,6 +184,7 @@ class DataLoader():
         with open(self.data_path, 'r') as f:
             data = f.read()
 
+        self.tokens_size = len(data)
         chars = sorted(list(set(data)))
         stoi = {ch:i for i, ch in enumerate(chars)}
         itos = {i:ch for i, ch in enumerate(chars)}
@@ -213,5 +214,8 @@ class DataLoader():
 
     def print_samples(self, n=100):
         # Print sample data
-        print("vocab size:", self.vocab_size)
         print("sample data:", self.decode(self.data[:n].tolist()))
+
+    def print_data_stats(self):
+        print("Data size:", self.tokens_size)
+        print("Vocab size:", self.vocab_size)

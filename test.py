@@ -73,14 +73,15 @@ def test_gpt_transformer():
     # Load data
     data_loader = DataLoader('./data/classical_corpus_simplified.txt', batch_size=16)
     data_loader.load_data()
-    data_loader.print_samples(n=200)
+    data_loader.print_data_stats()
+    # data_loader.print_samples(n=200)
 
     # Initialize model (reduced size for small dataset)
     model = GPTTransformer(vocab_size=data_loader.get_vocab_size(),
-                           block_size=32,
-                           n_embd=32,
-                           n_head=4,
-                           n_layer=4,
+                           block_size=128,
+                           n_embd=48,
+                           n_head=6,
+                           n_layer=6,
                            dropout=0.1)
     model.print_params()
 
@@ -88,7 +89,7 @@ def test_gpt_transformer():
     trainer = Trainer(data_loader, model, learning_rate=1e-3)
 
     # Train the model
-    trainer.train(max_iters=5000)
+    trainer.train(max_iters=20000)
 
     # Generate text
     context = torch.zeros((1, 1), dtype=torch.long)
