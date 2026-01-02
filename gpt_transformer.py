@@ -55,7 +55,7 @@ class GPTTransformer(nn.Module):
         """Save model parameters to the given path."""
         torch.save(self.state_dict(), path)
 
-    def load_model(self, path, map_location=None):
+    def load_model(self, path, map_location=torch.device(device)):
         """Load model parameters from the given path."""
         self.load_state_dict(torch.load(path, map_location=map_location))
 
