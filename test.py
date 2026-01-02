@@ -1,4 +1,5 @@
 import sys
+import os
 
 import torch
 import nnet
@@ -68,47 +69,58 @@ def test_convnet(architecture='simple'):
     print("Evaluating the trained ConvNet on test data:")
     print(net.evaluate(test_data))
 
-def test_gpt_transformer(data_path, save_path=None, load_path=None, train_model=True, check_model_params=False):
+def test_gpt_transformer(data_path, save_path=None, load_path=None, train_model=True, check_model_params=False, input_text=None):
     # Load data
     data_loader = DataLoader(data_path, batch_size=16)
     data_loader.load_data()
     data_loader.print_data_stats()
     # data_loader.print_samples(n=200)
 
-    # Initialize model (reduced size for small dataset)
-    # model = GPTTransformer(vocab_size=data_loader.get_vocab_size(),
-    #                        block_size=16,
-    #                        n_embd=48,
-    #                        n_head=6,
-    #                        n_layer=6,
-    #                        dropout=0.1)
+    # The configuration to train "shijing.txt" and "lunyu.txt".
     model = GPTTransformer(vocab_size=data_loader.get_vocab_size(),
-                        block_size=16,
-                        n_embd=64,
-                        n_head=4,
-                        n_layer=4,
-                        dropout=0.1)
+                           block_size=16,
+                           n_embd=64,
+                           n_head=4,
+                           n_layer=4,
+                           dropout=0.2)
+
+    # The configuration to train "classical_poetry_simplified.txt".
+    # model = GPTTransformer(vocab_size=data_loader.get_vocab_size(),
+    #                     block_size=32,
+    #                     n_embd=256,
+    #                     n_head=6,
+    #                     n_layer=6,
+    #                     dropout=0.2)
     model.print_params()
     if check_model_params:
         return
 
-    if load_path:
+    model_loaded = False
+    if load_path and os.path.exists(load_path):
         print(f"Loading model parameters from {load_path}")
         model.load_model(load_path)
+        model_loaded = True
 
     if train_model:
         # Initialize trainer
-        trainer = Trainer(data_loader, model, learning_rate=1e-3)
+        trainer = Trainer(data_loader, model, learning_rate=1e-4)
         # Train the model
         trainer.train(max_iters=20000)
         if save_path:
             print(f"Saving model parameters to {save_path}")
             model.save_model(save_path)
+    elif not model_loaded:
+        print("Model not trained or loaded. Exiting test.")
+        return
 
     # Generate text
-    context = torch.zeros((1, 1), dtype=torch.long)
-    generated = model.generate(context, max_new_tokens=300)
-    print("Generated text:", data_loader.decode(generated[0].tolist()))
+    if input_text:
+        print(f"Starting with input text: {input_text}")
+        context = torch.tensor([data_loader.encode(input_text)], dtype=torch.long)
+    else:
+        context = torch.zeros((1, 1), dtype=torch.long)
+    generated = model.generate(context, max_new_tokens=500)
+    print("Generated text:\n", data_loader.decode(generated[0].tolist()))
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -129,7 +141,8 @@ if __name__ == "__main__":
             'save_path': None,
             'load_path': None,
             'train_model': True,
-            'check_model_params': False
+            'check_model_params': False,
+            'input_text': None
         }
         # Parse key=value pairs
         for arg in sys.argv[2:]:
@@ -142,11 +155,12 @@ if __name__ == "__main__":
                 else:
                     params[key] = value
         test_gpt_transformer(
-            data_path=params.get('data_path', './data/classical_poetry_simplified.txt'),
+            data_path=params.get('data_path', './data/shijing.txt'),
             save_path=params['save_path'],
             load_path=params['load_path'],
             train_model=params['train_model'],
-            check_model_params=params['check_model_params']
+            check_model_params=params['check_model_params'],
+            input_text=params['input_text']
         )
     else:
         print("Unknown test type. Use 'nnet', 'convnet', or 'gpt_transformer'.")
