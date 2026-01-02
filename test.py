@@ -68,20 +68,26 @@ def test_convnet(architecture='simple'):
     print("Evaluating the trained ConvNet on test data:")
     print(net.evaluate(test_data))
 
-def test_gpt_transformer(save_path=None, load_path=None, train_model=True, check_model_params=False):
+def test_gpt_transformer(data_path, save_path=None, load_path=None, train_model=True, check_model_params=False):
     # Load data
-    data_loader = DataLoader('./data/classical_corpus_simplified.txt', batch_size=16)
+    data_loader = DataLoader(data_path, batch_size=16)
     data_loader.load_data()
     data_loader.print_data_stats()
     # data_loader.print_samples(n=200)
 
     # Initialize model (reduced size for small dataset)
+    # model = GPTTransformer(vocab_size=data_loader.get_vocab_size(),
+    #                        block_size=16,
+    #                        n_embd=48,
+    #                        n_head=6,
+    #                        n_layer=6,
+    #                        dropout=0.1)
     model = GPTTransformer(vocab_size=data_loader.get_vocab_size(),
-                           block_size=16,
-                           n_embd=48,
-                           n_head=6,
-                           n_layer=6,
-                           dropout=0.1)
+                        block_size=16,
+                        n_embd=64,
+                        n_head=4,
+                        n_layer=4,
+                        dropout=0.1)
     model.print_params()
     if check_model_params:
         return
@@ -101,7 +107,7 @@ def test_gpt_transformer(save_path=None, load_path=None, train_model=True, check
 
     # Generate text
     context = torch.zeros((1, 1), dtype=torch.long)
-    generated = model.generate(context, max_new_tokens=200)
+    generated = model.generate(context, max_new_tokens=300)
     print("Generated text:", data_loader.decode(generated[0].tolist()))
 
 if __name__ == "__main__":
@@ -136,6 +142,7 @@ if __name__ == "__main__":
                 else:
                     params[key] = value
         test_gpt_transformer(
+            data_path=params.get('data_path', './data/classical_poetry_simplified.txt'),
             save_path=params['save_path'],
             load_path=params['load_path'],
             train_model=params['train_model'],
