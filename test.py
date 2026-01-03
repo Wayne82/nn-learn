@@ -103,7 +103,7 @@ def test_gpt_transformer(data_path, save_path=None, load_path=None, train_model=
 
     if train_model:
         # Initialize trainer
-        trainer = Trainer(data_loader, model, learning_rate=1e-4)
+        trainer = Trainer(data_loader, model, learning_rate=1e-3)
         # Train the model
         trainer.train(max_iters=20000)
         if save_path:
